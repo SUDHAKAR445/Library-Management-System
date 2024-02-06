@@ -38,6 +38,11 @@ public class TransactionController {
         return transactionService.createTransaction(transaction);
     }
 
+    @PostMapping("/create/list")
+    public ResponseEntity<List<Transaction>> createTransactions(@RequestBody List<Transaction> transaction) {
+        return transactionService.createTransactions(transaction);
+    }
+
     @PutMapping("/return/{usernameOrEmail}/{bookId}")
     public ResponseEntity<Transaction> returnBook(@PathVariable String usernameOrEmail, @PathVariable String bookId) {
         return transactionService.returnBook(usernameOrEmail, bookId);

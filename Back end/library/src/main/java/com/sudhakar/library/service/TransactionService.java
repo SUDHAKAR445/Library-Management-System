@@ -22,4 +22,6 @@ public interface TransactionService {
     ResponseEntity<List<Transaction>> getTransactionByUsernameOrEmailWithStatus(String usernameOrEmail,
             TransactionStatus status);
 
+    ResponseEntity<List<Transaction>> createTransactions(List<Transaction> transactions);
+
 }

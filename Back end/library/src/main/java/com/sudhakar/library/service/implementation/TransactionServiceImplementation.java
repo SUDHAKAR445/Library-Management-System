@@ -2,6 +2,7 @@ package com.sudhakar.library.service.implementation;
 
 import java.math.BigDecimal;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.Optional;
@@ -93,6 +94,54 @@ public class TransactionServiceImplementation implements TransactionService {
             return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
+
+    //Create the multiple transaction at a time
+    //i pass the each and every time i pass the username because i need to modify the entire code a list of book for that purpose i create the list of transaction each contain username
+    public ResponseEntity<List<Transaction>> createTransactions(List<Transaction> transactions) {
+    try {
+        List<Transaction> savedTransactions = new ArrayList<>();
+
+        for (Transaction transaction : transactions) {
+            Optional<Book> optionalBook = bookRepository.findByBookId(transaction.getBook().getBookId());
+            Optional<User> optionalUser = userRepository.findByUsername(transaction.getUser().getUsername());
+
+            if (optionalBook.isPresent() && optionalUser.isPresent()) {
+                Book book = optionalBook.get();
+                User user = optionalUser.get();
+
+                Optional<Transaction> existingTransaction = transactionRepository
+                        .findByUserAndBookAndTransactionStatus(user, book, TransactionStatus.BORROW);
+
+                if (existingTransaction.isPresent()) {
+                    return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
+                }
+
+                if (book.getAvailableQuantity() <= 0) {
+                    return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
+                }
+
+                transaction.setBook(book);
+                transaction.setUser(user);
+                transaction.setBorrowDate(new Date());
+                transaction.setTransactionStatus(TransactionStatus.BORROW);
+
+                Transaction savedTransaction = transactionRepository.save(transaction);
+                savedTransactions.add(savedTransaction);
+
+                book.setAvailableQuantity(book.getAvailableQuantity() - 1);
+                bookRepository.save(book);
+            } else {
+                return new ResponseEntity<>(HttpStatus.NOT_FOUND);
+            }
+        }
+
+        return new ResponseEntity<>(savedTransactions, HttpStatus.CREATED);
+
+    } catch (Exception e) {
+        return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+}
+
 
     public ResponseEntity<Transaction> returnBook(String usernameOrEmail, String bookId) {
         try {
