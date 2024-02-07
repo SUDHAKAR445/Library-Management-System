@@ -95,53 +95,79 @@ public class TransactionServiceImplementation implements TransactionService {
         }
     }
 
-    //Create the multiple transaction at a time
-    //i pass the each and every time i pass the username because i need to modify the entire code a list of book for that purpose i create the list of transaction each contain username
+    // Create the multiple transaction at a time
+    // i pass the each and every time i pass the username because i need to modify
+    // the entire code a list of book for that purpose i create the list of
+    // transaction each contain username
     public ResponseEntity<List<Transaction>> createTransactions(List<Transaction> transactions) {
-    try {
+        //store all transaction which are successfully created
         List<Transaction> savedTransactions = new ArrayList<>();
+        //store all transaction which are available quantity is 0
+        List<Transaction> notFoundTransactions = new ArrayList<>();
+        //store all transaction which are already exists
+        List<Transaction> errorTransactions = new ArrayList<>();
+        try {
 
-        for (Transaction transaction : transactions) {
-            Optional<Book> optionalBook = bookRepository.findByBookId(transaction.getBook().getBookId());
-            Optional<User> optionalUser = userRepository.findByUsername(transaction.getUser().getUsername());
+            // available quantity of all books
+            for (Transaction transaction : transactions) {
+                Optional<Book> optionalBook = bookRepository.findByBookId(transaction.getBook().getBookId());
+                Optional<User> optionalUser = userRepository.findByUsername(transaction.getUser().getUsername());
 
-            if (optionalBook.isPresent() && optionalUser.isPresent()) {
-                Book book = optionalBook.get();
-                User user = optionalUser.get();
+                if (optionalBook.isPresent() && optionalUser.isPresent()) {
+                    Book book = optionalBook.get();
 
-                Optional<Transaction> existingTransaction = transactionRepository
-                        .findByUserAndBookAndTransactionStatus(user, book, TransactionStatus.BORROW);
-
-                if (existingTransaction.isPresent()) {
-                    return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
+                    if (book.getAvailableQuantity() <= 0) {
+                        notFoundTransactions.add(transaction);
+                    }
+                } else {
+                    notFoundTransactions.add(transaction);
                 }
-
-                if (book.getAvailableQuantity() <= 0) {
-                    return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
-                }
-
-                transaction.setBook(book);
-                transaction.setUser(user);
-                transaction.setBorrowDate(new Date());
-                transaction.setTransactionStatus(TransactionStatus.BORROW);
-
-                Transaction savedTransaction = transactionRepository.save(transaction);
-                savedTransactions.add(savedTransaction);
-
-                book.setAvailableQuantity(book.getAvailableQuantity() - 1);
-                bookRepository.save(book);
-            } else {
-                return new ResponseEntity<>(HttpStatus.NOT_FOUND);
             }
+            // if the available quantity is equal to 0 then we proceed
+            if (notFoundTransactions.isEmpty()) {
+                for (Transaction transaction : transactions) {
+                    Optional<Book> optionalBook = bookRepository.findByBookId(transaction.getBook().getBookId());
+                    Optional<User> optionalUser = userRepository.findByUsername(transaction.getUser().getUsername());
+
+                    if (optionalBook.isPresent() && optionalUser.isPresent()) {
+                        Book book = optionalBook.get();
+                        User user = optionalUser.get();
+
+                        Optional<Transaction> existingTransaction = transactionRepository
+                                .findByUserAndBookAndTransactionStatus(user, book, TransactionStatus.BORROW);
+
+                        //check transaction already exists
+                        if (existingTransaction.isPresent()) {
+                            errorTransactions.add(transaction);
+                        } else {
+                            //create the transaction
+                            transaction.setBook(book);
+                            transaction.setUser(user);
+                            transaction.setBorrowDate(new Date());
+                            transaction.setTransactionStatus(TransactionStatus.BORROW);
+
+                            Transaction savedTransaction = transactionRepository.save(transaction);
+                            savedTransactions.add(savedTransaction);
+
+                            book.setAvailableQuantity(book.getAvailableQuantity() - 1);
+                            bookRepository.save(book);
+                        }
+                    } else {
+                        errorTransactions.add(transaction);
+                    }
+                }
+            }
+            if (!notFoundTransactions.isEmpty()) {
+                return new ResponseEntity<>(notFoundTransactions, HttpStatus.NOT_FOUND);
+            } else if (!errorTransactions.isEmpty()) {
+                return new ResponseEntity<>(errorTransactions, HttpStatus.BAD_REQUEST);
+            } else {
+                return new ResponseEntity<>(savedTransactions, HttpStatus.CREATED);
+            }
+        } catch (Exception e) {
+            return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
         }
-
-        return new ResponseEntity<>(savedTransactions, HttpStatus.CREATED);
-
-    } catch (Exception e) {
-        return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
     }
-}
-
 
     public ResponseEntity<Transaction> returnBook(String usernameOrEmail, String bookId) {
         try {
